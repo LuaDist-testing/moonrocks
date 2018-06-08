@@ -11,7 +11,10 @@ local *
 
 load_rockspec = (fname) ->
   rockspec = {}
-  fn = assert loadfile fname
+  fn, err = loadfile fname
+  unless fn
+    error "failed to load rockspec `#{fname}`: #{err}"
+
   setfenv fn, rockspec
   assert pcall fn
 
@@ -19,6 +22,15 @@ load_rockspec = (fname) ->
   assert rockspec.version, "Invalid rockspec `#{fname} `(missing version)"
 
   rockspec
+
+parse_rock_fname = (fname) ->
+  base = fname\match "([^/]+)%.rock$"
+  unless base
+    return nil, "not rock"
+
+  base\match "^(.-)-([^-]+-[^-]+)%.([^.]+)$"
+
+parse
 
 prompt = (msg) ->
   while true
@@ -30,15 +42,31 @@ prompt = (msg) ->
 actions = {
   {
     name: "upload"
-    usage: "upload <rockspec>"
-    help: "Pack source rock, upload rockspec and source rock to server. Pass --skip-pack to skip sending source rock"
+    usage: "upload <rockspec|rock>"
+    help: "Pack source rock, upload rockspec and source rock to server. Pass --skip-pack to skip sending source rock. Development rockspecs will skip uploading packed module by default, pass --upload-rock to force upload. Can also upload rock for existing module and version."
 
     (fname) =>
       unless fname
         error "missing rockspec (moonrocks #{get_action"upload".usage})"
 
-      assert fname, "missing rockspec (moonrocks upload my-package.rockspec)"
       api = Api @
+
+      -- see if just uploading rock
+      module_name, module_version = parse_rock_fname fname
+      if module_name
+        res = api\method "check_rockspec", {
+          package: module_name
+          version: module_version
+        }
+
+        unless res.version
+          error "You don't have a module named #{module_name} with version #{module_version} in your account, did you upload a rockspec yet?"
+
+        print colors "%{cyan}Sending%{reset} #{fname}..."
+        res = api\method "upload_rock/#{res.version.id}", nil, rock_file: File(fname)
+        print colors "%{bright green}Success:%{reset} #{res.module_url}"
+        return
+
       rockspec = load_rockspec fname
 
       rock_fname = unless @["skip-pack"]
@@ -71,7 +99,9 @@ actions = {
       if res.is_new and #res.manifests == 0
         print colors "%{bright yellow}Warning: module not added to root manifest due to name taken"
 
-      if rock_fname
+      if res.version.development and not @["upload-rock"]
+        print colors "%{cyan}Skipping uploading rock for development version%{reset}"
+      elseif rock_fname
         print colors "%{cyan}Sending%{reset} #{rock_fname}..."
         api\method "upload_rock/#{res.version.id}", nil, rock_file: File(rock_fname)
 

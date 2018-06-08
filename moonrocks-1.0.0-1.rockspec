@@ -1,19 +1,18 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "moonrocks"
-version = "0.0.1-1"
+version = "1.0.0-1"
 
 -- LuaDist source
 source = {
-  tag = "0.0.1-1",
+  tag = "1.0.0-1",
   url = "git://github.com/LuaDist-testing/moonrocks.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/leafo/moonrocks.git",
---   branch = "v0.0.1"
+--   branch = "v1.0.0"
 -- }
-
 
 description = {
   summary = "A tool for installing and uploading Lua packages to rocks.moonscript.org",

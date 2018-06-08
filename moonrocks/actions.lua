@@ -1,30 +1,41 @@
 local Api
 do
-  local _table_0 = require("moonrocks.api")
-  Api = _table_0.Api
+  local _obj_0 = require("moonrocks.api")
+  Api = _obj_0.Api
 end
 local File
 do
-  local _table_0 = require("moonrocks.multipart")
-  File = _table_0.File
+  local _obj_0 = require("moonrocks.multipart")
+  File = _obj_0.File
 end
 local columnize
 do
-  local _table_0 = require("moonrocks.util")
-  columnize = _table_0.columnize
+  local _obj_0 = require("moonrocks.util")
+  columnize = _obj_0.columnize
 end
 local colors = require("ansicolors")
 local pretty = require("pl.pretty")
-local load_rockspec, prompt, actions, get_action, run
+local load_rockspec, parse_rock_fname, prompt, actions, get_action, run
 load_rockspec = function(fname)
   local rockspec = { }
-  local fn = assert(loadfile(fname))
+  local fn, err = loadfile(fname)
+  if not (fn) then
+    error("failed to load rockspec `" .. tostring(fname) .. "`: " .. tostring(err))
+  end
   setfenv(fn, rockspec)
   assert(pcall(fn))
   assert(rockspec.package, "Invalid rockspec `" .. tostring(fname) .. "` (missing package)")
   assert(rockspec.version, "Invalid rockspec `" .. tostring(fname) .. " `(missing version)")
   return rockspec
 end
+parse_rock_fname = function(fname)
+  local base = fname:match("([^/]+)%.rock$")
+  if not (base) then
+    return nil, "not rock"
+  end
+  return base:match("^(.-)-([^-]+-[^-]+)%.([^.]+)$")
+end
+local _ = parse
 prompt = function(msg)
   while true do
     io.stdout:write(colors(tostring(msg) .. " [Y/n]: "))
@@ -40,14 +51,29 @@ end
 actions = {
   {
     name = "upload",
-    usage = "upload <rockspec>",
-    help = "Pack source rock, upload rockspec and source rock to server. Pass --skip-pack to skip sending source rock",
+    usage = "upload <rockspec|rock>",
+    help = "Pack source rock, upload rockspec and source rock to server. Pass --skip-pack to skip sending source rock. Development rockspecs will skip uploading packed module by default, pass --upload-rock to force upload. Can also upload rock for existing module and version.",
     function(self, fname)
       if not (fname) then
         error("missing rockspec (moonrocks " .. tostring(get_action("upload").usage) .. ")")
       end
-      assert(fname, "missing rockspec (moonrocks upload my-package.rockspec)")
       local api = Api(self)
+      local module_name, module_version = parse_rock_fname(fname)
+      if module_name then
+        local res = api:method("check_rockspec", {
+          package = module_name,
+          version = module_version
+        })
+        if not (res.version) then
+          error("You don't have a module named " .. tostring(module_name) .. " with version " .. tostring(module_version) .. " in your account, did you upload a rockspec yet?")
+        end
+        print(colors("%{cyan}Sending%{reset} " .. tostring(fname) .. "..."))
+        res = api:method("upload_rock/" .. tostring(res.version.id), nil, {
+          rock_file = File(fname)
+        })
+        print(colors("%{bright green}Success:%{reset} " .. tostring(res.module_url)))
+        return 
+      end
       local rockspec = load_rockspec(fname)
       local rock_fname
       if not (self["skip-pack"]) then
@@ -81,7 +107,9 @@ actions = {
       if res.is_new and #res.manifests == 0 then
         print(colors("%{bright yellow}Warning: module not added to root manifest due to name taken"))
       end
-      if rock_fname then
+      if res.version.development and not self["upload-rock"] then
+        print(colors("%{cyan}Skipping uploading rock for development version%{reset}"))
+      elseif rock_fname then
         print(colors("%{cyan}Sending%{reset} " .. tostring(rock_fname) .. "..."))
         api:method("upload_rock/" .. tostring(res.version.id), nil, {
           rock_file = File(rock_fname)
@@ -94,7 +122,8 @@ actions = {
     name = "install",
     help = "Install a rock using `luarocks`, sets server to rocks.moonscript.org",
     function(self)
-      local escaped_args = (function()
+      local escaped_args
+      do
         local _accum_0 = { }
         local _len_0 = 1
         local _list_0 = self.original_args
@@ -107,8 +136,8 @@ actions = {
           end
           _len_0 = _len_0 + 1
         end
-        return _accum_0
-      end)()
+        escaped_args = _accum_0
+      end
       local server = Api.server
       if not (server:match("^%w+://")) then
         server = "http://" .. server
@@ -140,9 +169,8 @@ actions = {
       print(columnize((function()
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_0 = actions
-        for _index_0 = 1, #_list_0 do
-          local t = _list_0[_index_0]
+        for _index_0 = 1, #actions do
+          local t = actions[_index_0]
           _accum_0[_len_0] = {
             t.usage or t.name,
             t.help
@@ -156,9 +184,8 @@ actions = {
   }
 }
 get_action = function(name)
-  local _list_0 = actions
-  for _index_0 = 1, #_list_0 do
-    local action = _list_0[_index_0]
+  for _index_0 = 1, #actions do
+    local action = actions[_index_0]
     if action.name == name then
       return action
     end
@@ -174,17 +201,16 @@ run = function(params, flags)
     })
     return os.exit(1)
   end
-  params = (function()
+  do
     local _accum_0 = { }
     local _len_0 = 1
-    local _list_0 = params
-    for _index_0 = 2, #_list_0 do
-      local p = _list_0[_index_0]
+    for _index_0 = 2, #params do
+      local p = params[_index_0]
       _accum_0[_len_0] = p
       _len_0 = _len_0 + 1
     end
-    return _accum_0
-  end)()
+    params = _accum_0
+  end
   local fn = assert(action[1], "action is missing fn")
   return xpcall((function()
     return fn(flags, unpack(params))
