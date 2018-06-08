@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "moonrocks"
-version = "1.0.0-1"
+version = "1.1.0-1"
 
 -- LuaDist source
 source = {
-  tag = "1.0.0-1",
+  tag = "1.1.0-1",
   url = "git://github.com/LuaDist-testing/moonrocks.git"
 }
 -- Original source
 -- source = {
 --   url = "git://github.com/leafo/moonrocks.git",
---   branch = "v1.0.0"
+--   branch = "v1.1.0"
 -- }
 
 description = {

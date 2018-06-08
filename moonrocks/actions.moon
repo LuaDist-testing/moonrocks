@@ -36,8 +36,9 @@ prompt = (msg) ->
   while true
     io.stdout\write colors "#{msg} [Y/n]: "
     line = io.stdin\read "*l"
+    return true if line == ""
     return false if line == "n"
-    return true if line == "Y"
+    return true if line\lower! == "y"
 
 actions = {
   {
@@ -121,7 +122,7 @@ actions = {
           arg
 
       server = Api.server
-      server = "http://" .. server unless server\match "^%w+://"
+      server = "https://" .. server unless server\match "^%w+://"
 
       table.insert escaped_args, 1, "--server=#{server}"
 

@@ -1,18 +1,9 @@
 local Api
-do
-  local _obj_0 = require("moonrocks.api")
-  Api = _obj_0.Api
-end
+Api = require("moonrocks.api").Api
 local File
-do
-  local _obj_0 = require("moonrocks.multipart")
-  File = _obj_0.File
-end
+File = require("moonrocks.multipart").File
 local columnize
-do
-  local _obj_0 = require("moonrocks.util")
-  columnize = _obj_0.columnize
-end
+columnize = require("moonrocks.util").columnize
 local colors = require("ansicolors")
 local pretty = require("pl.pretty")
 local load_rockspec, parse_rock_fname, prompt, actions, get_action, run
@@ -40,10 +31,13 @@ prompt = function(msg)
   while true do
     io.stdout:write(colors(tostring(msg) .. " [Y/n]: "))
     local line = io.stdin:read("*l")
+    if line == "" then
+      return true
+    end
     if line == "n" then
       return false
     end
-    if line == "Y" then
+    if line:lower() == "y" then
       return true
     end
   end
@@ -140,7 +134,7 @@ actions = {
       end
       local server = Api.server
       if not (server:match("^%w+://")) then
-        server = "http://" .. server
+        server = "https://" .. server
       end
       table.insert(escaped_args, 1, "--server=" .. tostring(server))
       local cmd = "luarocks " .. tostring(table.concat(escaped_args, " "))
